@@ -147,7 +147,7 @@ status_options_contacts = ['Brak kontaktu', 'Nowy (Do kontaktu)', 'Wysłano HT-m
 status_options_buyers = ['Nowy', 'Zapytany', 'Zainteresowany', 'Kupił', 'Niezainteresowany', 'Do ponowienia']
 
 # === SEKCJA 1: REJESTR KONTAKTÓW (DLA POBOROWYCH) ===
-st.header('Rejestr Kontaktów (Poborowi)')
+st.header('Rejestr Kontaktów')
 st.markdown("Wpisz ID managera lub **użyj listy na dole**, aby automatycznie wypełnić formularz.")
 
 # Inicjalizacja pól formularza
@@ -234,7 +234,7 @@ if submit_button_contact:
 
 
 # === SEKCJA 2: WYŚWIETLANIE BAZY KONTAKTÓW (POBOROWI) ===
-st.header('Twoja Baza Kontaktów (Poborowi)')
+st.header('Twoja Baza Kontaktów')
 if df_contacts.empty:
     st.info('Twoja baza kontaktów jest pusta.')
 else:
@@ -306,7 +306,7 @@ else:
 st.divider() 
 
 # === SEKCJA 4: IMPORT I PRZEGLĄDARKA LISTY POBOROWYCH ===
-st.header('Przeglądarka Listy Poborowych')
+st.header('Przeglądarka Listy')
 uploaded_file = st.file_uploader("Wgraj plik CSV z poborowymi", type=['csv', 'xlsx'], key="player_list_uploader")
 
 if uploaded_file is not None:
