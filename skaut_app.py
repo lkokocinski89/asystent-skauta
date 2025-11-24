@@ -80,7 +80,8 @@ def init_db():
                 PRIMARY KEY (scout_nick, manager_id)
             );
         '''))
-        # Tabela importowanych graczy
+        # NOWA TABELA: Importowani gracze
+        # Używamy TEXT dla skilli, aby uniknąć błędów z przecinkami/kropkami
         s.execute(text('''
             CREATE TABLE IF NOT EXISTS imported_players (
                 scout_nick TEXT,
@@ -113,13 +114,8 @@ def load_contacts_db(nick):
         df['data_kontaktu'] = pd.to_datetime(df['data_kontaktu'])
     return df
 
-def load_buyers_db(nick):
-    df = conn.query("SELECT * FROM buyers WHERE scout_nick = :nick", params={"nick": nick}, ttl=0)
-    if not df.empty:
-        df['data_kontaktu'] = pd.to_datetime(df['data_kontaktu'])
-    return df
-
 def load_saved_players(nick):
+    """Ładuje zapisaną listę graczy z bazy"""
     df = conn.query('SELECT * FROM imported_players WHERE scout_nick = :nick', params={"nick": nick}, ttl=0)
     return df
 
@@ -130,6 +126,7 @@ def fill_form_callback():
     if match and not st.session_state.player_list_df.empty:
         try:
             player_id_to_find = int(match.group(1))
+            # Filtrowanie z bezpiecznym typem
             player_data_series = st.session_state.player_list_df[
                 st.session_state.player_list_df['PlayerID'].astype(str) == str(player_id_to_find)
             ]
@@ -161,10 +158,11 @@ def fill_form_callback():
         st.session_state.form_player_id = ""
 
 
-# --- Główna Logika - Ładowanie danych ---
+# --- Główna Logika ---
 df_contacts = load_contacts_db(scout_nick)
-df_buyers = load_buyers_db(scout_nick)
+df_buyers = conn.query("SELECT * FROM buyers WHERE scout_nick = :nick", params={"nick": scout_nick}, ttl=0)
 
+# --- Próba załadowania zapisanej listy graczy przy starcie ---
 if st.session_state.player_list_df.empty:
     saved_players = load_saved_players(scout_nick)
     if not saved_players.empty:
@@ -178,6 +176,7 @@ status_options_buyers = ['Nowy', 'Zapytany', 'Zainteresowany', 'Kupił', 'Niezai
 st.header('Rejestr Kontaktów (Poborowi)')
 st.markdown("Wpisz ID managera lub **użyj listy na dole**, aby automatycznie wypełnić formularz.")
 
+# Inicjalizacja pól formularza
 if 'form_manager_id' not in st.session_state: st.session_state.form_manager_id = ""
 if 'form_manager_nick' not in st.session_state: st.session_state.form_manager_nick = ""
 if 'form_player_name' not in st.session_state: st.session_state.form_player_name = ""
@@ -256,27 +255,6 @@ else:
     display_columns = ['manager_id', 'nick_managera', 'imie_nazwisko_zawodnika', 'id_gracza', 'status', 'notatki', 'data_kontaktu']
     st.data_editor(df_contacts[display_columns].sort_values(by='data_kontaktu', ascending=False), use_container_width=True)
 
-    # === SEKCJA USUWANIA KONTAKTÓW ===
-    with st.expander("🗑️ Zarządzanie / Usuwanie wpisów (Poborowi)"):
-        # Lista do wyboru: Nick Managera (ID) - Imię Nazwisko gracza
-        delete_options = [
-            f"{row['nick_managera'] or 'Bez nicku'} (ID: {row['manager_id']}) - {row['imie_nazwisko_zawodnika'] or '?'}" 
-            for i, row in df_contacts.iterrows()
-        ]
-        selected_delete = st.selectbox("Wybierz wpis do usunięcia:", delete_options, key="delete_contact_select")
-        
-        if st.button("❌ Usuń wybranego managera z bazy kontaktów"):
-            # Wyciągnij ID z tekstu
-            match = re.search(r'\(ID: (\d+)\)', selected_delete)
-            if match:
-                id_to_delete = match.group(1)
-                with conn.session as s:
-                    s.execute(text("DELETE FROM contacts WHERE scout_nick = :nick AND manager_id = :id"), 
-                              params={"nick": scout_nick, "id": id_to_delete})
-                    s.commit()
-                st.success(f"Usunięto managera o ID: {id_to_delete}")
-                st.rerun()
-
 st.divider() 
 
 # === SEKCJA 3: REJESTR KUPCÓW ===
@@ -330,25 +308,6 @@ if df_buyers.empty:
     st.info('Baza kupców pusta.')
 else:
     st.data_editor(df_buyers.drop(columns=['scout_nick']).sort_values(by='data_kontaktu', ascending=False), use_container_width=True)
-
-    # === SEKCJA USUWANIA KUPCÓW ===
-    with st.expander("🗑️ Zarządzanie / Usuwanie wpisów (Kupcy)"):
-        delete_options_buyers = [
-            f"{row['nick_managera'] or 'Bez nicku'} (ID: {row['manager_id']})" 
-            for i, row in df_buyers.iterrows()
-        ]
-        selected_delete_buyer = st.selectbox("Wybierz kupca do usunięcia:", delete_options_buyers, key="delete_buyer_select")
-        
-        if st.button("❌ Usuń wybranego kupca"):
-            match = re.search(r'\(ID: (\d+)\)', selected_delete_buyer)
-            if match:
-                id_to_delete = match.group(1)
-                with conn.session as s:
-                    s.execute(text("DELETE FROM buyers WHERE scout_nick = :nick AND manager_id = :id"), 
-                              params={"nick": scout_nick, "id": id_to_delete})
-                    s.commit()
-                st.success(f"Usunięto kupca o ID: {id_to_delete}")
-                st.rerun()
 
 st.divider() 
 
